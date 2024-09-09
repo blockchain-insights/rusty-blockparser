@@ -116,6 +116,21 @@ pub fn eval_from_bytes(bytes: &[u8], version_id: u8) -> EvaluatedScript {
     }
 }
 
+use sha2::{Sha256, Digest};
+use hex;
+
+pub fn create_script_hash(script: &Script, hash_type: Option<&str>) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(script.to_bytes());
+    let result = hasher.finalize();
+    let hash = hex::encode(result);
+
+    match hash_type {
+        Some(typ) => format!("{}_{}", typ, hash),
+        None => hash,
+    }
+}
+
 /// Extracts evaluated address from script using `rust_bitcoin`
 pub fn eval_from_bytes_bitcoin(bytes: &[u8], version_id: u8) -> EvaluatedScript {
     let network = match version_id {
@@ -131,9 +146,9 @@ pub fn eval_from_bytes_bitcoin(bytes: &[u8], version_id: u8) -> EvaluatedScript 
         // OP_RETURN 13 <data>
         let data = String::from_utf8(script.to_bytes().into_iter().skip(2).collect());
         let pattern = ScriptPattern::OpReturn(data.unwrap_or_else(|_| String::from("")));
-        return EvaluatedScript::new(None, pattern);
+        return EvaluatedScript::new(Some(create_script_hash(&script, Some("OP_RETURN"))), pattern);
     } else if script.is_provably_unspendable() {
-        return EvaluatedScript::new(None, ScriptPattern::Unspendable);
+        return EvaluatedScript::new(Some(create_script_hash(&script, Some("UNSPENDABLE"))), ScriptPattern::Unspendable);
     }
 
     let address = match Address::from_script(script, network) {
@@ -142,7 +157,7 @@ pub fn eval_from_bytes_bitcoin(bytes: &[u8], version_id: u8) -> EvaluatedScript 
             if err != address::Error::UnrecognizedScript {
                 warn!(target: "script", "Unable to extract evaluated address: {}", err)
             }
-            None
+            Some(create_script_hash(&script, Some("UNKNOWN")))
         }
     };
 
@@ -164,7 +179,7 @@ pub fn eval_from_bytes_bitcoin(bytes: &[u8], version_id: u8) -> EvaluatedScript 
     } else if script.is_witness_program() {
         EvaluatedScript::new(address, ScriptPattern::WitnessProgram)
     } else {
-        EvaluatedScript::new(address, ScriptPattern::NotRecognised)
+        EvaluatedScript::new(Some(create_script_hash(&script, Some("UNKNOWN"))), ScriptPattern::NotRecognised)
     }
 }
 
@@ -278,7 +293,7 @@ mod tests {
             0x73, 0x20, 0x68, 0x65, 0x69, 0x64, 0x69,
         ];
         let result = eval_from_bytes_bitcoin(&bytes, 0x00);
-        assert_eq!(result.address, None);
+        assert_eq!(result.address, Some("OP_RETURN_a2524bf097d520b4c340a1c3e957bcc6add3d35015c7c42259c0911c56f2a1af".to_string()));
         assert_eq!(
             result.pattern,
             ScriptPattern::OpReturn(String::from("charley loves heidi"))
@@ -291,7 +306,7 @@ mod tests {
         //                    OP_IFDUP OP_IF OP_2SWAP OP_VERIFY OP_2OVER OP_DEPTH
         let bytes = [0x73, 0x63, 0x72, 0x69, 0x70, 0x74];
         let result = eval_from_bytes_bitcoin(&bytes, 0x00);
-        assert_eq!(result.address, None);
+        assert_eq!(result.address, Some("UNKNOWN_21a0270b7f66a1e4c25933f13a1e5a1bbb4757578072930c8189131f9c6aaae1".to_string()));
         assert_eq!(result.pattern, ScriptPattern::NotRecognised);
     }
 
@@ -299,7 +314,7 @@ mod tests {
     fn test_bitcoin_bogus_script() {
         let bytes = [0x4c, 0xFF, 0x00];
         let result = eval_from_bytes_bitcoin(&bytes, 0x00);
-        assert_eq!(result.address, None);
+        assert_eq!(result.address, Some("UNKNOWN_a1a4e8bd4532ca283aff29d6210bd4eb29070cf397ab4a48d7be277d8305a18c".to_string()));
         assert_eq!(result.pattern, ScriptPattern::NotRecognised);
     }
 }
