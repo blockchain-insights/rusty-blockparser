@@ -223,6 +223,73 @@ impl Coin for NoCoinium {
 * The next change is in `src/main.rs`. Under the fn `parse_args()` add your coin to the array of coins. The case you use here will be the same value as you pass in the arguments when executing the blockchain (using the `-c` argument)
 * Finally, add your coin name in the README.md file so others know your coin is supported
 
+
+## Docker Image
+
+### Prerequisites
+
+- Docker installed on your system
+- Git (to clone the repository, if needed)
+
+### Building the Docker Image
+
+1. Clone the repository (if you haven't already):
+   ```
+   git clone https://github.com/blockchain-insights/rusty-blockparser.git
+   cd rusty-blockparser
+   ```
+
+2. Build the Docker image:
+   ```
+   docker build -t rusty-blockparser .
+   ```
+
+### Running the Docker Container
+
+The general syntax for running the container is:
+
+```
+docker run -v /path/to/blockchain:/blockchain rusty-blockparser [OPTIONS] [COMMAND]
+```
+
+Replace `/path/to/blockchain` with the path to your blockchain data directory.
+
+#### Examples
+
+1. Run with default options:
+   ```
+   docker run rusty-blockparser
+   ```
+
+2. Specify blockchain directory:
+   ```
+   docker run -v /path/to/blockchain:/blockchain rusty-blockparser --blockchain-dir /blockchain
+   ```
+
+3. Run a specific command (e.g., `simplestats`):
+   ```
+   docker run -v /path/to/blockchain:/blockchain rusty-blockparser --blockchain-dir /blockchain simplestats
+   ```
+
+4. Run with additional options:
+   ```
+   docker run rusty-blockparser -v -c bitcoin --blockchain-dir /blockchain csvdump
+   ```
+
+### Available Commands and Options
+
+For a full list of commands and options, run:
+
+```
+docker run rusty-blockparser --help
+```
+
+### Troubleshooting
+
+If you encounter permission issues when accessing the blockchain directory, ensure that the user running Docker has the necessary permissions to access the specified path.
+
+For any other issues or questions, please open an issue in the GitHub repository.
+
 ## TODO
 
 * Implement Pay2MultiSig script evaluation
